@@ -111,6 +111,9 @@ kbd { border: 1px solid #414146; color: #85858b; padding: 2px 5px; font: 9px var
   border-bottom: 1px solid #29292c; color: #aaaab0;
 }
 .panel-title span { font: 600 10px var(--font-mono); letter-spacing: .13em; }
+.set-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 8px 0; }
+.set-tabs button { min-height: 32px; border: 1px solid #303035; background: #111113; color: #77777e; font: 700 10px var(--font-mono); letter-spacing: .09em; cursor: pointer; }
+.set-tabs button.active { border-color: var(--accent); color: #fff; background: color-mix(in srgb,var(--accent) 13%,#111113); box-shadow: inset 0 -2px 0 var(--accent); }
 .preset-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
 .preset {
   position: relative; text-align: left; height: 64px; border: 1px solid #29292d;

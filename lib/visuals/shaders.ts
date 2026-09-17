@@ -21,7 +21,7 @@ float body(vec2 uv){return texture2D(u_body,vec2(sourceUv(uv).x,1.-uv.y)).r;}
 void main(){
   vec2 uv=v_uv; vec2 px=1./u_resolution;
   float t=u_time, k=u_intensity;
-  if(u_mode>6.5){
+  if(u_mode>6.5&&u_mode<7.5){
     // Character selection is constant across each cell; glyphs stay crisp as the subject moves.
     float cellWidth=mix(7.,24.,u_pixel)*max(1.,u_resolution.x/1280.);
     vec2 cell=vec2(cellWidth,cellWidth*1.6);
@@ -63,7 +63,7 @@ void main(){
     float bands=1.-smoothstep(.015,.12,abs(fract(l*9.+t*.04)-.5));
     col=raw*(.1+person*.16)+vec3(.06,.92,.7)*(edge*.5+bands*person*.34);
     col+=vec3(.7,1.,.92)*contour*u_bodyReady;
-  }else{
+  }else if(u_mode<6.5){
     vec2 p=uv-.5; vec2 crt=p*(1.+dot(p,p)*.15)+.5;
     float roll=exp(-abs(fract(crt.y+t*.1)-.5)*65.);
     crt.x+=sin(crt.y*85.+t*.9)*.0015*k;
@@ -72,6 +72,12 @@ void main(){
     col=vec3(.015,1.,1.)*(light*.85+edge*.5)*scan;
     col+=vec3(.0,.8,1.)*roll*(.08+light*.38)*(1.+k);
     col*=step(0.,crt.x)*step(crt.x,1.)*step(0.,crt.y)*step(crt.y,1.);
+  }else{
+    // High-contrast stage for the VOL 14 kinetic portrait physics.
+    float poster=floor(l*5.)/5.;
+    vec3 split=mix(vec3(.02,.75,1.),vec3(1.,.05,.72),smoothstep(.28,.72,uv.x+u_motion.x*.4));
+    col=raw*(.12+.2*person)+split*(edge*.72+poster*.12*person);
+    col+=vec3(.82,1.,1.)*smoothstep(.25,.8,person)*.045;
   }
   // Persistent ping-pong feedback: previous silhouettes expand and advect with movement.
   float history=(u_mode> .5&&u_mode<1.5)? .995 : ((u_mode>4.5&&u_mode<5.5)? .99:.65);

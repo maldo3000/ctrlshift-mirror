@@ -1,6 +1,7 @@
 import type { EffectSettings, Point, TrackingFrame } from "../vision/types";
 import { assetUrl } from "../asset-url";
 import { MotionParticles } from "./particles";
+import { FacePhysics } from "./face-physics";
 import { ThumbTrigger, CornerTrigger, cornerButton, EyeLaserTrigger } from "../vision/gestures";
 import * as shaders from "./shaders";
 
@@ -27,6 +28,7 @@ export class VisualRenderer {
   private particles=new MotionParticles();private bodyReady=false;private bodyAt=0;
   private thumb=new ThumbTrigger();private brand:WebGLProgram;private brandTextures:WebGLTexture[];
   private corner=new CornerTrigger();private bursts=new MotionParticles();
+  private facePhysics=new FacePhysics();
   private eyeLaser=new EyeLaserTrigger();private laser:WebGLProgram;
   private overlay=document.createElement("canvas");private overlayTexture:WebGLTexture;
   private overlayKey="";private handReady=false;private live=false;private renderNow=0;
@@ -106,7 +108,7 @@ export class VisualRenderer {
     if(s.frozen){this.present();return;}
     this.time+=dt;
     const gl=this.gl;
-    if(this.lastMode!==s.mode||this.lastMirror!==s.mirror||this.lastEnabled!==s.particlesEnabled){this.clearHistory();this.lastMode=s.mode;this.lastMirror=s.mirror;this.lastEnabled=s.particlesEnabled;}
+    if(this.lastMode!==s.mode||this.lastMirror!==s.mirror||this.lastEnabled!==s.particlesEnabled){this.clearHistory();if(s.mode===8)this.facePhysics.reset(this.canvas.clientWidth||1,this.canvas.clientHeight||1);this.lastMode=s.mode;this.lastMirror=s.mirror;this.lastEnabled=s.particlesEnabled;}
     if(video&&video.readyState>=2&&s.hasVideo){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.videoTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);}
     const tracking=!!this.targetPoints.length&&!!this.frame&&now-this.receivedAt<900;
     const alpha=1-Math.exp(-dt*18);
@@ -121,6 +123,7 @@ export class VisualRenderer {
     const nose=this.points[1]??{x:.5,y:.5,z:0};
     this.velocity.x+=(Math.max(-.3,Math.min(.3,(nose.x-this.previousCenter.x)/Math.max(dt,.016)))-this.velocity.x)*alpha;
     this.velocity.y+=(Math.max(-.3,Math.min(.3,(nose.y-this.previousCenter.y)/Math.max(dt,.016)))-this.velocity.y)*alpha;this.previousCenter=nose;
+    if(s.mode===8)this.facePhysics.update(dt,this.canvas.clientWidth||1,this.canvas.clientHeight||1,this.points,this.frame?.hands,!!s.mirror);
     const p=this.base;gl.bindFramebuffer(gl.FRAMEBUFFER,this.targets[this.write].framebuffer);gl.disable(gl.BLEND);gl.useProgram(p);
     this.bind(p,"u_video",this.videoTexture,0);this.bind(p,"u_previous",this.targets[1-this.write].texture,1);this.bind(p,"u_body",this.bodyTexture,2);this.bind(p,"u_ascii",this.asciiTexture,3);
     gl.uniform2f(this.loc(p,"u_resolution"),this.canvas.width,this.canvas.height);
@@ -131,7 +134,7 @@ export class VisualRenderer {
     for(const [name,value] of Object.entries({u_feedback:s.feedback,u_pixel:s.pixel,u_threshold:s.threshold}))this.f(p,name,value);
     this.common(p,s);this.fullscreen(p);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    if(s.mode!==7&&this.lock>.01&&this.points.length>=468&&this.triangles.length){
+    if(s.mode!==7&&s.mode!==8&&this.lock>.01&&this.points.length>=468&&this.triangles.length){
       const vertices=new Float32Array(this.triangles.length*6);
       this.triangles.forEach((index,i)=>{const v=this.points[index];vertices.set([v.x,v.y,v.z,i%3===0?1:0,i%3===1?1:0,i%3===2?1:0],i*6);});
       gl.useProgram(this.mesh);this.common(this.mesh,s);
@@ -147,7 +150,7 @@ export class VisualRenderer {
     particles.set(burst,s.particlesEnabled?motion.length:0);
     if(particles.length){
       gl.useProgram(this.dots);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);this.f(this.dots,"u_mirror",s.mirror);this.f(this.dots,"u_scale",Math.min(devicePixelRatio,1.5));
-      const colors=[[.9,.35,1.],[.2,1.,.55],[1.,.35,.08],[.65,.5,1.],[.1,.75,1.],[.25,1.,.8],[.03,1.,1.],[.55,1.,.74]];
+      const colors=[[.9,.35,1.],[.2,1.,.55],[1.,.35,.08],[.65,.5,1.],[.1,.75,1.],[.25,1.,.8],[.03,1.,1.],[.55,1.,.74],[.2,.9,1.]];
       gl.uniform3fv(this.loc(this.dots,"u_color"),colors[s.mode]);gl.bindBuffer(gl.ARRAY_BUFFER,this.pointBuffer);gl.bufferData(gl.ARRAY_BUFFER,particles,gl.DYNAMIC_DRAW);this.attribute(this.dots,"a_particle",4);gl.drawArrays(gl.POINTS,0,particles.length/4);
     }
     gl.disable(gl.BLEND);this.write=1-this.write;this.present();
@@ -182,14 +185,19 @@ export class VisualRenderer {
     const progress=ready&&this.corner.fresh(this.renderNow)?Math.round(this.corner.progress*20)/20:0;
     const touching=ready&&this.corner.fresh(this.renderNow)&&this.corner.touching;
     const firing=this.lastMode===4&&this.eyeLaser.strength>.5;
-    const key=[Math.round(w),Math.round(h),this.lastMode,this.live,ready,progress,touching,firing].join(":");
+    const key=[Math.round(w),Math.round(h),this.lastMode,this.live,ready,progress,touching,firing,this.lastMode===8?Math.round(this.time*60):0].join(":");
     if(key!==this.overlayKey){
       this.overlayKey=key;this.overlay.width=Math.round(w);this.overlay.height=Math.round(h);
       const ctx=this.overlay.getContext("2d")!;
+      if(this.lastMode===8)this.facePhysics.draw(ctx);
       ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";ctx.shadowColor="#000";ctx.shadowBlur=10;
       if(this.live&&[0,2,4,7].includes(this.lastMode)){
         ctx.font=`200 ${Math.max(20,Math.min(38,w*.03))}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
         ctx.fillText(this.lastMode===4?(firing?"heat vision":"open your eyes wide"):"smile :)",w*.5,h*.91);
+      }
+      if(this.live&&this.lastMode===8){
+        ctx.font=`200 ${Math.max(18,Math.min(32,w*.025))}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.fillText("move to hit the faces",w*.5,h*.91);
       }
       if(ready){
         const {x,y,radius:r}=cornerButton(w,h);

@@ -27,7 +27,8 @@ try{
     await page.goto("http://127.0.0.1:4173"+base);
     await page.waitForFunction(()=>document.querySelector(".offline-status")?.textContent?.includes("Ready offline on this device"),{},{timeout:30000}).catch(async e=>{console.log(await page.locator("body").innerText());throw e;});
     console.log("Offline cache installed",base);
-    assert.equal(await page.locator(".preset").count(),8);
+    assert.equal(await page.locator(".preset").count(),5);
+    assert.ok((await page.locator(".set-tabs .active").textContent())?.includes("VOL 14"));
     assert.equal(await page.locator(".renderer-error").count(),0);
     await context.setOffline(true);await page.reload();
     await page.waitForFunction(()=>document.querySelector(".offline-status")?.textContent?.includes("Ready offline on this device"));
@@ -38,10 +39,13 @@ try{
     const options=await page.locator("#camera-select option").count();assert.ok(options>=2,"fake USB/webcam option appears after permission");
     await page.locator(".camera-picker button").filter({hasText:"APPLY CAMERA"}).click();
     await page.getByText("CAMERA ONLINE",{exact:false}).first().waitFor({timeout:30000});
-    await page.locator("canvas").focus();await page.keyboard.press("8");await page.waitForFunction(()=>document.querySelector(".preset.active")?.textContent?.includes("ASCII"));
+    await page.locator("canvas").focus();await page.keyboard.press("5");await page.waitForFunction(()=>document.querySelector(".preset.active")?.textContent?.includes("Face Bounce"));
     await page.keyboard.press("Space");await page.waitForFunction(()=>document.querySelector(".preset.active")?.textContent?.includes("Prism"));
+    await page.getByRole("button",{name:"ALL FX"}).click();assert.equal(await page.locator(".preset").count(),9);
+    await page.locator("canvas").focus();await page.keyboard.press("8");await page.waitForFunction(()=>document.querySelector(".preset.active")?.textContent?.includes("ASCII"));
+    await page.keyboard.press("Space");await page.waitForFunction(()=>document.querySelector(".preset.active")?.textContent?.includes("Face Bounce"));
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${base}: offline reload, 8 filters, WebGL, model startup, camera picker/apply, shortcuts`);
+    console.log(`PASS ${base}: offline reload, VOL 14 + 9 filters, WebGL, model startup, camera picker/apply, shortcuts`);
     await context.close();
   }
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

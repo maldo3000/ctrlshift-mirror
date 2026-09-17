@@ -10,8 +10,8 @@ export class FacePhysics {
   private bodies:Body[]=[];
   private width=0;private height=0;
   private previous=new Map<string,{x:number;y:number}>();
-  private joshHead:HTMLImageElement;
-  constructor(){this.joshHead=new Image();this.joshHead.decoding="async";this.joshHead.src=assetUrl("/portraits/josh-head.png");}
+  private portraits:HTMLImageElement[];
+  constructor(){this.portraits=["/portraits/josh-head.png","/portraits/sid-head.png"].map(src=>{const image=new Image();image.decoding="async";image.src=assetUrl(src);return image;});}
   reset(width:number,height:number){
     this.width=width;this.height=height;this.previous.clear();
     const count=Math.max(8,Math.min(14,Math.round(width/135)));
@@ -63,10 +63,11 @@ export class FacePhysics {
       ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.angle);
       ctx.shadowColor=b.color;ctx.shadowBlur=b.r*.7;ctx.fillStyle=b.color;ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(2,b.r*.055);
       ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
-      if(!b.kind&&this.joshHead.complete&&this.joshHead.naturalWidth){
+      const portrait=this.portraits[b.kind];
+      if(portrait.complete&&portrait.naturalWidth){
         const size=b.r*2.42;
-        ctx.drawImage(this.joshHead,-size*.5,-size*.5,size,size);
-        ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.lineWidth=Math.max(2,b.r*.055);ctx.strokeStyle="#b9faff";ctx.stroke();
+        ctx.drawImage(portrait,-size*.5,-size*.5,size,size);
+        ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.lineWidth=Math.max(2,b.r*.055);ctx.strokeStyle=b.kind?"#ffc4ef":"#b9faff";ctx.stroke();
         ctx.restore();continue;
       }
       ctx.fillStyle="#08090c";

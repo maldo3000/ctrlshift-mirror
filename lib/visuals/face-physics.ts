@@ -1,4 +1,5 @@
 import type { Point, TrackingFrame } from "../vision/types";
+import { assetUrl } from "../asset-url";
 
 type Body={x:number;y:number;vx:number;vy:number;r:number;angle:number;spin:number;color:string;kind:number};
 type Collider={x:number;y:number;vx:number;vy:number;r:number};
@@ -9,6 +10,8 @@ export class FacePhysics {
   private bodies:Body[]=[];
   private width=0;private height=0;
   private previous=new Map<string,{x:number;y:number}>();
+  private joshHead:HTMLImageElement;
+  constructor(){this.joshHead=new Image();this.joshHead.decoding="async";this.joshHead.src=assetUrl("/portraits/josh-head.png");}
   reset(width:number,height:number){
     this.width=width;this.height=height;this.previous.clear();
     const count=Math.max(8,Math.min(14,Math.round(width/135)));
@@ -60,10 +63,16 @@ export class FacePhysics {
       ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.angle);
       ctx.shadowColor=b.color;ctx.shadowBlur=b.r*.7;ctx.fillStyle=b.color;ctx.strokeStyle="#fff";ctx.lineWidth=Math.max(2,b.r*.055);
       ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+      if(!b.kind&&this.joshHead.complete&&this.joshHead.naturalWidth){
+        const size=b.r*2.42;
+        ctx.drawImage(this.joshHead,-size*.5,-size*.5,size,size);
+        ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.lineWidth=Math.max(2,b.r*.055);ctx.strokeStyle="#b9faff";ctx.stroke();
+        ctx.restore();continue;
+      }
       ctx.fillStyle="#08090c";
       ctx.beginPath();ctx.arc(-b.r*.3,-b.r*.17,b.r*.095,0,Math.PI*2);ctx.arc(b.r*.3,-b.r*.17,b.r*.095,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(0,b.r*.04,b.r*.48,.18*Math.PI,.82*Math.PI);ctx.lineWidth=Math.max(3,b.r*.085);ctx.strokeStyle="#08090c";ctx.lineCap="round";ctx.stroke();
-      ctx.fillStyle="#fff";ctx.font=`700 ${Math.max(9,b.r*.23)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(b.kind?"S":"J",0,b.r*.67);
+      ctx.fillStyle="#fff";ctx.font=`700 ${Math.max(9,b.r*.23)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("S",0,b.r*.67);
       ctx.restore();
     }
   }

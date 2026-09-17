@@ -16,7 +16,7 @@ export class FacePhysics {
     this.width=width;this.height=height;this.previous.clear();
     const count=Math.max(8,Math.min(14,Math.round(width/135)));
     this.bodies=Array.from({length:count},(_,i)=>{
-      const r=Math.max(24,Math.min(48,Math.min(width,height)*(.038+(i%3)*.004)));
+      const r=1.4*Math.max(24,Math.min(48,Math.min(width,height)*(.038+(i%3)*.004)));
       return {x:r+(i*173%(Math.max(1,width-r*2))),y:r+(i*97%(Math.max(1,height*.48))),vx:((i%5)-2)*24,vy:-20-(i%4)*15,r,angle:i*.7,spin:(i%2?1:-1)*(.45+(i%4)*.12),color:i%2?"#ff4fd8":"#36e6ff",kind:i%2};
     });
   }

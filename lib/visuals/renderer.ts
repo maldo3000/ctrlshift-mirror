@@ -123,7 +123,7 @@ export class VisualRenderer {
     const nose=this.points[1]??{x:.5,y:.5,z:0};
     this.velocity.x+=(Math.max(-.3,Math.min(.3,(nose.x-this.previousCenter.x)/Math.max(dt,.016)))-this.velocity.x)*alpha;
     this.velocity.y+=(Math.max(-.3,Math.min(.3,(nose.y-this.previousCenter.y)/Math.max(dt,.016)))-this.velocity.y)*alpha;this.previousCenter=nose;
-    if(s.mode===8)this.facePhysics.update(dt,this.canvas.clientWidth||1,this.canvas.clientHeight||1,this.points,this.frame?.hands,!!s.mirror);
+    if(s.mode===8)this.facePhysics.update(dt,this.canvas.clientWidth||1,this.canvas.clientHeight||1,tracking&&s.hasVideo?this.points:[],s.hasVideo&&now-this.receivedAt<900?this.frame?.hands:[],!!s.mirror);
     const p=this.base;gl.bindFramebuffer(gl.FRAMEBUFFER,this.targets[this.write].framebuffer);gl.disable(gl.BLEND);gl.useProgram(p);
     this.bind(p,"u_video",this.videoTexture,0);this.bind(p,"u_previous",this.targets[1-this.write].texture,1);this.bind(p,"u_body",this.bodyTexture,2);this.bind(p,"u_ascii",this.asciiTexture,3);
     gl.uniform2f(this.loc(p,"u_resolution"),this.canvas.width,this.canvas.height);

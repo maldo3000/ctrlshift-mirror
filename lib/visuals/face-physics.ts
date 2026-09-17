@@ -4,11 +4,11 @@ import { assetUrl } from "../asset-url";
 type Body={x:number;y:number;vx:number;vy:number;r:number;angle:number;spin:number;color:string;kind:number};
 type Collider={x:number;y:number;vx:number;vy:number;r:number};
 
-// Lightweight 2D physics for the VOL 14 placeholder portraits. The vector faces can
-// later be replaced by Josh/Sid image textures without changing the collision model.
+// Low-gravity portrait physics with buoyancy and smoothed camera colliders.
 export class FacePhysics {
   private bodies:Body[]=[];
   private width=0;private height=0;
+  private time=0;
   private previous=new Map<string,{x:number;y:number}>();
   private portraits:HTMLImageElement[];
   constructor(){this.portraits=["/portraits/josh-head.png","/portraits/sid-head.png"].map(src=>{const image=new Image();image.decoding="async";image.src=assetUrl(src);return image;});}
@@ -21,8 +21,10 @@ export class FacePhysics {
     });
   }
   private collider(key:string,x:number,y:number,r:number,dt:number):Collider{
-    const old=this.previous.get(key);this.previous.set(key,{x,y});
-    return {x,y,r,vx:old?(x-old.x)/Math.max(.016,dt):0,vy:old?(y-old.y)/Math.max(.016,dt):0};
+    const old=this.previous.get(key),alpha=1-Math.exp(-dt*22);
+    const next=old?{x:old.x+(x-old.x)*alpha,y:old.y+(y-old.y)*alpha}:{x,y};
+    this.previous.set(key,next);
+    return {...next,r,vx:old?(next.x-old.x)/Math.max(.008,dt):0,vy:old?(next.y-old.y)/Math.max(.008,dt):0};
   }
   update(dt:number,width:number,height:number,points:Point[],hands:TrackingFrame["hands"],mirror:boolean){
     if(!this.bodies.length||Math.abs(width-this.width)>2||Math.abs(height-this.height)>2)this.reset(width,height);
@@ -30,25 +32,34 @@ export class FacePhysics {
     if(points.length>=468){
       const map=(p:Point)=>({x:(mirror?1-p.x:p.x)*width,y:p.y*height});
       const nose=map(points[1]),left=map(points[234]),right=map(points[454]);
-      colliders.push(this.collider("face",nose.x,nose.y,Math.max(42,Math.hypot(right.x-left.x,right.y-left.y)*.6),dt));
-    }
+      colliders.push(this.collider("face",nose.x,nose.y,Math.max(50,Math.hypot(right.x-left.x,right.y-left.y)*.7),dt));
+    }else this.previous.delete("face");
     for(const [i,hand] of (hands??[]).entries()){
       const p=hand.indexTip??hand.tip,x=(mirror?1-p.x:p.x)*width,y=p.y*height;
-      colliders.push(this.collider(`hand-${i}`,x,y,Math.max(30,Math.min(width,height)*.045),dt));
+      colliders.push(this.collider(`hand-${i}`,x,y,Math.max(44,Math.min(width,height)*.07),dt));
     }
+    for(const key of this.previous.keys())if(key.startsWith("hand-")&&Number(key.slice(5))>=(hands?.length??0))this.previous.delete(key);
     const step=Math.min(.032,Math.max(.001,dt));
-    for(const b of this.bodies){
-      b.vy+=height*.23*step;b.vx*=Math.pow(.988,step*60);b.vy*=Math.pow(.994,step*60);
+    this.time+=step;
+    for(const [index,b] of this.bodies.entries()){
+      // Gentle downward gravity, with rising air near the floor to keep heads in reach.
+      const lift=Math.max(0,(b.y/height-.55)/.45);
+      b.vy+=height*(.055-.22*lift+Math.sin(this.time*.8+index*1.7)*.018)*step;
+      b.vx+=width*.018*Math.sin(this.time*.6+index*2.4)*step;
+      b.vx*=Math.exp(-.16*step);b.vy*=Math.exp(-.12*step);
       b.x+=b.vx*step;b.y+=b.vy*step;b.angle+=b.spin*step;
       if(b.x<b.r){b.x=b.r;b.vx=Math.abs(b.vx)*.84;}else if(b.x>width-b.r){b.x=width-b.r;b.vx=-Math.abs(b.vx)*.84;}
-      if(b.y<b.r){b.y=b.r;b.vy=Math.abs(b.vy)*.82;}else if(b.y>height-b.r){b.y=height-b.r;b.vy=-Math.abs(b.vy)*.82;b.vx*=.95;}
+      if(b.y<b.r){b.y=b.r;b.vy=Math.abs(b.vy)*.88;}else if(b.y>height-b.r){b.y=height-b.r;b.vy=-Math.max(height*.17,Math.abs(b.vy)*.88);}
       for(const c of colliders){
         const dx=b.x-c.x,dy=b.y-c.y,d=Math.hypot(dx,dy),min=b.r+c.r;
         if(d>=min)continue;
         const nx=d>.001?dx/d:1,ny=d>.001?dy/d:0,push=min-d;
         b.x+=nx*push;b.y+=ny*push;
-        const impact=Math.max(120,Math.min(950,Math.hypot(c.vx,c.vy)*.72+230));
-        b.vx=nx*impact+c.vx*.52;b.vy=ny*impact+c.vy*.52;b.spin+=(nx*c.vy-ny*c.vx)*.006;
+        const impact=Math.max(220,Math.min(900,Math.hypot(c.vx,c.vy)*1.05+300));
+        b.vx=nx*impact+c.vx*.8;b.vy=ny*impact+c.vy*.8;
+        const speed=Math.hypot(b.vx,b.vy),limit=Math.max(width,height)*1.25;
+        if(speed>limit){b.vx*=limit/speed;b.vy*=limit/speed;}
+        b.spin=Math.max(-6,Math.min(6,b.spin+(nx*c.vy-ny*c.vx)*.006));
       }
     }
     for(let i=0;i<this.bodies.length;i++)for(let j=i+1;j<this.bodies.length;j++){

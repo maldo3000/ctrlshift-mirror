@@ -2,6 +2,7 @@ import type { EffectSettings, Point, TrackingFrame } from "../vision/types";
 import { assetUrl } from "../asset-url";
 import { MotionParticles } from "./particles";
 import { FacePhysics } from "./face-physics";
+import { BodyContact } from "../vision/body-contact";
 import { ThumbTrigger, CornerTrigger, cornerButton, EyeLaserTrigger } from "../vision/gestures";
 import * as shaders from "./shaders";
 
@@ -29,6 +30,8 @@ export class VisualRenderer {
   private thumb=new ThumbTrigger();private brand:WebGLProgram;private brandTextures:WebGLTexture[];
   private corner=new CornerTrigger();private bursts=new MotionParticles();
   private facePhysics=new FacePhysics();
+  private bodyContact=new BodyContact();
+  private hands:NonNullable<TrackingFrame["hands"]>=[];private handsAt=-Infinity;
   private eyeLaser=new EyeLaserTrigger();private laser:WebGLProgram;
   private overlay=document.createElement("canvas");private overlayTexture:WebGLTexture;
   private overlayKey="";private handReady=false;private live=false;private renderNow=0;
@@ -77,18 +80,21 @@ export class VisualRenderer {
     this.receivedAt=performance.now();
     this.handReady=!!frame.gesturesAvailable;
     if(frame.hands){
+      this.hands=frame.hands;this.handsAt=this.receivedAt;
       const tip=this.thumb.observe(frame.hands,frame.time);
       if(tip)this.bursts.burst(tip.x,tip.y,s.particles,this.canvas.width/this.canvas.height);
-      if(this.corner.observe(frame.hands,this.receivedAt,!!s.mirror,this.canvas.clientWidth,this.canvas.clientHeight))this.onNext();
     }
     this.particles.observe(frame.points,frame.time,s.particles,s.particlesEnabled>0);
     if(frame.mask&&frame.maskWidth&&frame.maskHeight){
+      this.bodyContact.observe(frame.mask,frame.maskWidth,frame.maskHeight,this.receivedAt);
       const gl=this.gl;gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.bodyTexture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
       gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,frame.maskWidth,frame.maskHeight,0,gl.LUMINANCE,gl.UNSIGNED_BYTE,frame.mask);
       this.bodyReady=true;this.bodyAt=performance.now();
       this.particles.observeBody(frame.mask,frame.maskWidth,frame.maskHeight,s.particles,s.particlesEnabled>0);
     }
+    const w=this.canvas.clientWidth,h=this.canvas.clientHeight;
+    if(s.hasVideo&&!s.frozen&&this.corner.observe(this.receivedAt-this.handsAt<350?this.hands:[],this.receivedAt,!!s.mirror,w,h,this.bodyContact.button(w,h,!!s.mirror,this.receivedAt),this.bodyContact.fresh(this.receivedAt)))this.onNext();
   }
   private clearHistory(){const gl=this.gl;for(const t of this.targets){gl.bindFramebuffer(gl.FRAMEBUFFER,t.framebuffer);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);}this.particles.clear();}
   private resize(){
@@ -123,7 +129,7 @@ export class VisualRenderer {
     const nose=this.points[1]??{x:.5,y:.5,z:0};
     this.velocity.x+=(Math.max(-.3,Math.min(.3,(nose.x-this.previousCenter.x)/Math.max(dt,.016)))-this.velocity.x)*alpha;
     this.velocity.y+=(Math.max(-.3,Math.min(.3,(nose.y-this.previousCenter.y)/Math.max(dt,.016)))-this.velocity.y)*alpha;this.previousCenter=nose;
-    if(s.mode===8)this.facePhysics.update(dt,this.canvas.clientWidth||1,this.canvas.clientHeight||1,tracking&&s.hasVideo?this.points:[],s.hasVideo&&now-this.receivedAt<900?this.frame?.hands:[],!!s.mirror);
+    if(s.mode===8)this.facePhysics.update(dt,this.canvas.clientWidth||1,this.canvas.clientHeight||1,tracking&&s.hasVideo?this.points:[],s.hasVideo&&now-this.handsAt<350?this.hands:[],!!s.mirror,s.hasVideo?this.bodyContact:undefined,now);
     const p=this.base;gl.bindFramebuffer(gl.FRAMEBUFFER,this.targets[this.write].framebuffer);gl.disable(gl.BLEND);gl.useProgram(p);
     this.bind(p,"u_video",this.videoTexture,0);this.bind(p,"u_previous",this.targets[1-this.write].texture,1);this.bind(p,"u_body",this.bodyTexture,2);this.bind(p,"u_ascii",this.asciiTexture,3);
     gl.uniform2f(this.loc(p,"u_resolution"),this.canvas.width,this.canvas.height);
@@ -181,7 +187,7 @@ export class VisualRenderer {
     gl.disable(gl.BLEND);
   }
   private drawInteraction(w:number,h:number){
-    const gl=this.gl,ready=this.live&&this.handReady&&this.renderNow-this.receivedAt<1500;
+    const gl=this.gl,ready=this.live&&(this.handReady||this.bodyContact.fresh(this.renderNow))&&this.renderNow-this.receivedAt<1500;
     const progress=ready&&this.corner.fresh(this.renderNow)?Math.round(this.corner.progress*20)/20:0;
     const touching=ready&&this.corner.fresh(this.renderNow)&&this.corner.touching;
     const firing=this.lastMode===4&&this.eyeLaser.strength>.5;

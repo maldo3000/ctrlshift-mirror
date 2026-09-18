@@ -39,13 +39,20 @@ export class CornerTrigger {
   private sample = -Infinity;
   private held = false;
   private outside = -1;
-  observe(hands: NonNullable<TrackingFrame["hands"]>, time: number, mirror: boolean, width=1280, height=720) {
+  private bodyArmed = false;
+  private bodyClear = -1;
+  observe(hands: NonNullable<TrackingFrame["hands"]>, time: number, mirror: boolean, width=1280, height=720, bodyContact=false, bodyFresh=false) {
     if (time <= this.sample) return false;
     const gap=time-this.sample;
-    if (gap > 900) { this.dwell = 0; this.progress = 0; this.touching=false; }
+    if (gap > 900) { this.dwell = 0; this.progress = 0; this.touching=false; this.bodyArmed=false;this.bodyClear=-1; }
     this.sample = time;
+    if(!bodyFresh){this.bodyArmed=false;this.bodyClear=-1;}
+    else if(!bodyContact){
+      if(this.bodyClear<0)this.bodyClear=time;
+      if(time-this.bodyClear>=400)this.bodyArmed=true;
+    }else this.bodyClear=-1;
     const b = cornerButton(width,height);
-    const inside = hands.some(hand => {
+    const inside = (bodyFresh&&bodyContact&&this.bodyArmed)||hands.some(hand => {
       const p = hand.indexTip;
       if (!p) return false;
       const x = mirror ? 1 - p.x : p.x;
@@ -65,6 +72,7 @@ export class CornerTrigger {
     this.progress = Math.min(1, this.dwell / 750);
     if (this.progress < 1) return false;
     this.held = true;
+    this.bodyArmed=false;
     return true;
   }
   fresh(time: number) { return time - this.sample < 900; }

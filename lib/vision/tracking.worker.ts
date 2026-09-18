@@ -67,7 +67,7 @@ self.onmessage = async (event: MessageEvent) => {
         }));
       } catch (error) { console.warn("Hand gestures stopped", error); gestures.close(); gestures = undefined; frame.gesturesAvailable = false; }
     }
-    if (segmenter && data.time - lastSegment > 160) {
+    if (segmenter && data.time - lastSegment > 80) {
       lastSegment = data.time;
       try {
         segmenter.segmentForVideo(bitmap, data.time, result => {

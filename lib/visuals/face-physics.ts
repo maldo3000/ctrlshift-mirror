@@ -1,5 +1,6 @@
 import type { Point, TrackingFrame } from "../vision/types";
 import { assetUrl } from "../asset-url";
+import type { BodyContact } from "../vision/body-contact";
 
 type Body={x:number;y:number;vx:number;vy:number;r:number;angle:number;spin:number;color:string;kind:number};
 type Collider={x:number;y:number;vx:number;vy:number;r:number};
@@ -26,7 +27,7 @@ export class FacePhysics {
     this.previous.set(key,next);
     return {...next,r,vx:old?(next.x-old.x)/Math.max(.008,dt):0,vy:old?(next.y-old.y)/Math.max(.008,dt):0};
   }
-  update(dt:number,width:number,height:number,points:Point[],hands:TrackingFrame["hands"],mirror:boolean){
+  update(dt:number,width:number,height:number,points:Point[],hands:TrackingFrame["hands"],mirror:boolean,body?:BodyContact,now=0){
     if(!this.bodies.length||Math.abs(width-this.width)>2||Math.abs(height-this.height)>2)this.reset(width,height);
     const colliders:Collider[]=[];
     if(points.length>=468){
@@ -48,6 +49,13 @@ export class FacePhysics {
       b.vx+=width*.018*Math.sin(this.time*.6+index*2.4)*step;
       b.vx*=Math.exp(-.16*step);b.vy*=Math.exp(-.12*step);
       b.x+=b.vx*step;b.y+=b.vy*step;b.angle+=b.spin*step;
+      const contact=body?.contact(b.x,b.y,b.r,width,height,mirror,now);
+      if(contact){
+        const outward=b.vx*contact.x+b.vy*contact.y;
+        const impulse=Math.max(0,Math.min(width,height)*.55-outward);
+        b.vx+=contact.x*impulse;b.vy+=contact.y*impulse;
+        b.x+=contact.x*height*.22*step;b.y+=contact.y*height*.22*step;
+      }
       if(b.x<b.r){b.x=b.r;b.vx=Math.abs(b.vx)*.84;}else if(b.x>width-b.r){b.x=width-b.r;b.vx=-Math.abs(b.vx)*.84;}
       if(b.y<b.r){b.y=b.r;b.vy=Math.abs(b.vy)*.88;}else if(b.y>height-b.r){b.y=height-b.r;b.vy=-Math.max(height*.17,Math.abs(b.vy)*.88);}
       for(const c of colliders){

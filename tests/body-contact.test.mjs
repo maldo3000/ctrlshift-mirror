@@ -14,6 +14,15 @@ function load(path){
 const {BodyContact}=load(resolve("lib/vision/body-contact.ts"));
 const {CornerTrigger,cornerButton}=load(resolve("lib/vision/gestures.ts"));
 const {FacePhysics}=load(resolve("lib/visuals/face-physics.ts"));
+test("Face Bounce includes all four portraits at every installation size",()=>{
+  const physics=new FacePhysics();
+  assert.deepEqual(Array.from(physics.portraits,p=>p.src),["/portraits/josh-head.png","/portraits/sid-head.png","/portraits/amy-head.png","/portraits/anson-head.png"]);
+  for(const [w,h] of [[640,480],[1920,1080]]){
+    physics.reset(w,h);
+    assert.equal(new Set(physics.bodies.map(b=>b.kind)).size,4);
+    assert.equal(new Set(physics.bodies.map(b=>b.color)).size,4);
+  }
+});
 function rectangle(x0,y0,x1,y1){
   const mask=new Uint8Array(10000);
   for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)mask[y*100+x]=255;

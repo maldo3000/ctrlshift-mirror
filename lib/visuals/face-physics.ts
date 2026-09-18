@@ -4,6 +4,12 @@ import type { BodyContact } from "../vision/body-contact";
 
 type Body={x:number;y:number;vx:number;vy:number;r:number;angle:number;spin:number;color:string;kind:number};
 type Collider={x:number;y:number;vx:number;vy:number;r:number};
+const CAST=[
+  {name:"Josh",src:"/portraits/josh-head.png",color:"#36e6ff"},
+  {name:"Sid",src:"/portraits/sid-head.png",color:"#ff4fd8"},
+  {name:"Amy",src:"/portraits/amy-head.png",color:"#acff69"},
+  {name:"Anson",src:"/portraits/anson-head.png",color:"#ffb94f"},
+];
 
 // Low-gravity portrait physics with buoyancy and smoothed camera colliders.
 export class FacePhysics {
@@ -12,13 +18,13 @@ export class FacePhysics {
   private time=0;
   private previous=new Map<string,{x:number;y:number}>();
   private portraits:HTMLImageElement[];
-  constructor(){this.portraits=["/portraits/josh-head.png","/portraits/sid-head.png"].map(src=>{const image=new Image();image.decoding="async";image.src=assetUrl(src);return image;});}
+  constructor(){this.portraits=CAST.map(({src})=>{const image=new Image();image.decoding="async";image.src=assetUrl(src);return image;});}
   reset(width:number,height:number){
     this.width=width;this.height=height;this.previous.clear();
     const count=Math.max(8,Math.min(14,Math.round(width/135)));
     this.bodies=Array.from({length:count},(_,i)=>{
       const r=1.4*Math.max(24,Math.min(48,Math.min(width,height)*(.038+(i%3)*.004)));
-      return {x:r+(i*173%(Math.max(1,width-r*2))),y:r+(i*97%(Math.max(1,height*.48))),vx:((i%5)-2)*24,vy:-20-(i%4)*15,r,angle:i*.7,spin:(i%2?1:-1)*(.45+(i%4)*.12),color:i%2?"#ff4fd8":"#36e6ff",kind:i%2};
+      return {x:r+(i*173%(Math.max(1,width-r*2))),y:r+(i*97%(Math.max(1,height*.48))),vx:((i%5)-2)*24,vy:-20-(i%4)*15,r,angle:i*.7,spin:(i%2?1:-1)*(.45+(i%4)*.12),color:CAST[i%CAST.length].color,kind:i%CAST.length};
     });
   }
   private collider(key:string,x:number,y:number,r:number,dt:number):Collider{
@@ -86,13 +92,13 @@ export class FacePhysics {
       if(portrait.complete&&portrait.naturalWidth){
         const size=b.r*2.42;
         ctx.drawImage(portrait,-size*.5,-size*.5,size,size);
-        ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.lineWidth=Math.max(2,b.r*.055);ctx.strokeStyle=b.kind?"#ffc4ef":"#b9faff";ctx.stroke();
+        ctx.beginPath();ctx.arc(0,0,b.r,0,Math.PI*2);ctx.lineWidth=Math.max(2,b.r*.055);ctx.strokeStyle=b.color;ctx.stroke();
         ctx.restore();continue;
       }
       ctx.fillStyle="#08090c";
       ctx.beginPath();ctx.arc(-b.r*.3,-b.r*.17,b.r*.095,0,Math.PI*2);ctx.arc(b.r*.3,-b.r*.17,b.r*.095,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(0,b.r*.04,b.r*.48,.18*Math.PI,.82*Math.PI);ctx.lineWidth=Math.max(3,b.r*.085);ctx.strokeStyle="#08090c";ctx.lineCap="round";ctx.stroke();
-      ctx.fillStyle="#fff";ctx.font=`700 ${Math.max(9,b.r*.23)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("S",0,b.r*.67);
+      ctx.fillStyle="#fff";ctx.font=`700 ${Math.max(9,b.r*.23)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(CAST[b.kind].name[0],0,b.r*.67);
       ctx.restore();
     }
   }
